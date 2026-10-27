@@ -224,7 +224,7 @@ def escribir_salida_analogica(n_salida: int, potencia: int, frecuencia = 1000):
         potencia = max(0, min(100, potencia))
         
         # Convertimos el porcentaje (0-100) a un entero de 16 bits (0-65535)
-        duty_16bit = int((potencia / 100) * 65535) + 1
+        duty_16bit = int((potencia / 100) * 65534) + 1
         
         pwm = _obtener_pwm(n_salida, freq=frecuencia)
         pwm.duty_u16(duty_16bit)
