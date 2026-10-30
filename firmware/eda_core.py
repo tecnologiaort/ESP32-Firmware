@@ -32,13 +32,13 @@ PIN_MAPS = {
         'servo_pins': [37, 18, 17, 21],
         'I2C': (9, 8),
         'us_outputs': [4, 7, 6, 34],
-        'digital_data': [10, 5, 23]
+        'digital_data': []
     }
 }
 
 # Variables de estado global
 _placa_actual = None
-PINS = None2
+PINS = None
 _matrices_neopixel = {}
 
 # Listas de objetos de hardware
@@ -47,6 +47,8 @@ _digital_inputs = []
 _us_outputs = []
 _adc_inputs = []
 _servo_pwms = [None, None, None, None]
+
+salidasDigitales = [False,False,False,False,False,False,False,False]
 
 try:
     for pin_num in PINS['servo_pins']:
@@ -101,6 +103,10 @@ def configurar_placa(nombre_placa: str):
     escribir_salida_analogica(2,0,1)
     escribir_salida_analogica(3,0,1)
     escribir_salida_analogica(4,0,1)
+    escribir_salida_digital(1,0)
+    escribir_salida_digital(2,0)
+    escribir_salida_digital(3,0)
+    escribir_salida_digital(4,0)
     
     print(f"Hardware base iniciado para: {_placa_actual}")
 
@@ -153,7 +159,8 @@ def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led
     if not (1 <= n_salida <= len(PINS['digital_data'])):
         print(f"Error: salida digital_data {n_salida} fuera de rango.")
         return
-
+    estadoP = salidasDigitales[n_salida]
+    escribir_salida_digital(n_salida, False)
     # Accedemos al pin mapeado según la placa configurada
     pin_num = PINS['digital_data'][n_salida - 1]
 
@@ -177,10 +184,12 @@ def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led
             np[n_led - 1] = (r_adj, g_adj, b_adj)
         else:
             print(f"Error: n_led debe estar entre 0 y {qleds}")
+            escribir_salida_digital(n_salida, estadoP)
             return
 
     np.write()
-
+    escribir_salida_digital(n_salida, estadoP)
+    
 def leer_entrada_digital(n_entrada: int) -> int:
     if 1 <= n_entrada <= 4:
         return _digital_inputs[n_entrada - 1].value()
@@ -236,6 +245,7 @@ def leer_entrada_analogica_RAW(n_entrada: int) -> float:
 def escribir_salida_digital(n_salida: int, estado: bool):
     if 1 <= n_salida <= 4:
         _digital_outputs[n_salida - 1].value(1 if estado else 0)
+        salidasDigitales[n_salida] = estado
     else:
         print(f"Error: salidaDigital {n_salida} fuera de rango (1-4).")
 
