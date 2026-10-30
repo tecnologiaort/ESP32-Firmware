@@ -8,6 +8,7 @@ Gestiona directamente el hardware del ESP32 (Pines, ADC, PWM).
 import machine
 import utime
 import math
+import neopixel
 from machine import Pin, PWM, ADC
 
 # ======================================================================
@@ -21,7 +22,8 @@ PIN_MAPS = {
         'digital_inputs': [39, 35, 4, 15],
         'servo_pins': [13, 14, 26, 33],
         'I2C': (22, 21),
-        'us_outputs': [19, 18, 4, 15]
+        'us_outputs': [19, 18, 4, 15],
+        'digital_data': [10, 5, 23]
     },
     'super_mini': {
         'digital_outputs': [38, 35, 36, 16],
@@ -29,13 +31,15 @@ PIN_MAPS = {
         'digital_inputs': [4, 7, 6, 34],
         'servo_pins': [37, 18, 17, 21],
         'I2C': (9, 8),
-        'us_outputs': [4, 7, 6, 34]
+        'us_outputs': [4, 7, 6, 34],
+        'digital_data': [10, 5, 23]
     }
 }
 
 # Variables de estado global
 _placa_actual = None
-PINS = None
+PINS = None2
+_matrices_neopixel = {}
 
 # Listas de objetos de hardware
 _digital_outputs = []
@@ -144,6 +148,38 @@ def mapeo_joystick(x, cero, out_min, out_max, in_min, in_max) -> int:
 # ======================================================================
 # --- 4. EJECUCIÓN DE HARDWARE (Sensores y Actuadores) -----------------
 # ======================================================================
+
+def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led: int, qleds: int):
+    if not (1 <= n_salida <= len(PINS['digital_data'])):
+        print(f"Error: salida digital_data {n_salida} fuera de rango.")
+        return
+
+    # Accedemos al pin mapeado según la placa configurada
+    pin_num = PINS['digital_data'][n_salida - 1]
+
+    if n_salida not in _matrices_neopixel:
+        pin = Pin(pin_num, Pin.OUT)
+        _matrices_neopixel[n_salida] = neopixel.NeoPixel(pin, qleds)
+
+    np = _matrices_neopixel[n_salida]
+
+    brillo = max(0, min(100, brillo))
+    factor = brillo / 100.0
+    r_adj = int(r * factor)
+    g_adj = int(g * factor)
+    b_adj = int(b * factor)
+
+    if n_led == 0:
+        for i in range(qleds):
+            np[i] = (r_adj, g_adj, b_adj)
+    else:
+        if 1 <= n_led <= qleds:
+            np[n_led - 1] = (r_adj, g_adj, b_adj)
+        else:
+            print(f"Error: n_led debe estar entre 0 y {qleds}")
+            return
+
+    np.write()
 
 def leer_entrada_digital(n_entrada: int) -> int:
     if 1 <= n_entrada <= 4:

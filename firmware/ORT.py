@@ -146,6 +146,10 @@ def salidaDigital(n_salida: int, estado: bool):
 def salidaAnalogica(n_salida: int, potencia: int, frecuencia: int = 1000):
     """Controla la potencia (0 a 100%) de una salida mediante PWM (1 a 4)."""
     eda_core.escribir_salida_analogica(n_salida, potencia, frecuencia)
+    
+def RGB(n_salida: int, brillo: int = 100, r: int = 255, g: int = 255, b: int = 255, n_led: int = 0, qleds: int = 7):
+    """Controla una matriz NeoPixel en la salida especificada (1, 2 o 3)."""
+    eda_core.controlar_neopixel(n_salida, brillo, r, g, b, n_led, qleds)
 
 
 # ======================================================================
@@ -332,4 +336,4 @@ def _ejecutar_paquete(paquete, modulo_red):
 
 
 time.sleep(0.2)
-iniciar(placa=modelo)
+iniciar(placa="Placa_Clasica")
