@@ -336,4 +336,4 @@ def _ejecutar_paquete(paquete, modulo_red):
 
 
 time.sleep(0.2)
-iniciar(placa="Placa_Clasica")
+iniciar(placa=modelo)
