@@ -43,6 +43,7 @@ _matrices_neopixel = {}
 
 # Listas de objetos de hardware
 _digital_outputs = []
+_digital_data = []
 _digital_inputs = []
 _us_outputs = []
 _adc_inputs = []
@@ -83,6 +84,9 @@ def configurar_placa(nombre_placa: str):
     _digital_outputs = [Pin(p, Pin.OUT) for p in PINS['digital_outputs']]
     for pin in _digital_outputs:
         pin.value(0)
+    _digital_data = [Pin(p, Pin.OUT) for p in PINS['digital_data']]
+    for pin in _digital_data:
+        pin.value(0)
         
     _digital_inputs = [Pin(p, Pin.IN, Pin.PULL_DOWN) for p in PINS['digital_inputs']]
     _us_outputs = [Pin(p, Pin.IN, Pin.PULL_DOWN) for p in PINS['us_outputs']]
@@ -93,20 +97,12 @@ def configurar_placa(nombre_placa: str):
         adc = ADC(Pin(p))
         adc.atten(ADC.ATTN_11DB) # Rango de 0 a 3.3V
         _adc_inputs.append(adc)
-    '''
-    for p in PINS['servo_pins']:
-        adc = ADC(Pin(p))
-        adc.atten(ADC.ATTN_11DB) # Rango de 0 a 3.3V
-        _adc_inputs.append(adc)
-    '''   
+    
     escribir_salida_analogica(1,0,1)
     escribir_salida_analogica(2,0,1)
     escribir_salida_analogica(3,0,1)
     escribir_salida_analogica(4,0,1)
-    escribir_salida_digital(1,0)
-    escribir_salida_digital(2,0)
-    escribir_salida_digital(3,0)
-    escribir_salida_digital(4,0)
+    
     
     print(f"Hardware base iniciado para: {_placa_actual}")
 
@@ -163,9 +159,9 @@ def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led
     escribir_salida_digital(n_salida, False)
     # Accedemos al pin mapeado según la placa configurada
     pin_num = PINS['digital_data'][n_salida - 1]
+    pin = Pin(pin_num, Pin.OUT)
 
     if n_salida not in _matrices_neopixel:
-        pin = Pin(pin_num, Pin.OUT)
         _matrices_neopixel[n_salida] = neopixel.NeoPixel(pin, qleds)
 
     np = _matrices_neopixel[n_salida]
@@ -188,6 +184,8 @@ def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led
             return
 
     np.write()
+    pin.value(0)
+    
     escribir_salida_digital(n_salida, estadoP)
     
 def leer_entrada_digital(n_entrada: int) -> int:
@@ -355,3 +353,4 @@ def reproducir_tono(n_salida: int, volumen: int, nota: int, octava: int):
     duty = int(volumen_log * 120) * 64
     
     pwm.duty_u16(duty)
+
