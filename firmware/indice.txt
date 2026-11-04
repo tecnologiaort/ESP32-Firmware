@@ -3,3 +3,4 @@ eda_core.py
 eda_i2c.py
 eda_wifi.py
 eda_bt.py
+main.py
