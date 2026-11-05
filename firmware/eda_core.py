@@ -172,14 +172,15 @@ def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led
     g_adj = int(g * factor)
     b_adj = int(b * factor)
 
-    if n_led == 0:
+    if n_led == -1:
         for i in range(qleds):
             np[i] = (r_adj, g_adj, b_adj)
     else:
-        if 1 <= n_led <= qleds:
-            np[n_led - 1] = (r_adj, g_adj, b_adj)
+        if 0 <= n_led <= qleds-1:
+            np[n_led] = (r_adj, g_adj, b_adj)
         else:
             print(f"Error: n_led debe estar entre 0 y {qleds}")
+            sleep(1)
             escribir_salida_digital(n_salida, estadoP)
             return
 
