@@ -310,7 +310,11 @@ def iniciarAP(ssid="EDA_Red", password="eda12345", canal=6):
 def iniciarSTA(ssid="EDA_Red", password="eda12345"):
     global _wifi_activo
     _wifi_activo = eda_wifi.iniciar_sta(ssid, password)
- 
+
+def conectarWifi(ssid="IoT Tecno", password="T3cnoIoT$25"):
+    global _wifi_activo
+    _wifi_activo = eda_wifi.iniciar_sta(ssid, password)
+    
 def escucharWifi():
 
     # --- ESCUCHA WIFI ---
