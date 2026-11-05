@@ -180,7 +180,7 @@ def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led
             np[n_led] = (r_adj, g_adj, b_adj)
         else:
             print(f"Error: n_led debe estar entre 0 y {qleds}")
-            sleep(1)
+            utime.sleep_us(100000)
             escribir_salida_digital(n_salida, estadoP)
             return
 
