@@ -23,7 +23,8 @@ PIN_MAPS = {
         'servo_pins': [13, 14, 26, 33],
         'I2C': (22, 21),
         'us_outputs': [19, 18, 4, 15],
-        'digital_data': [10, 5, 23]
+        'digital_data': [10, 5, 23],
+        
     },
     'super_mini': {
         'digital_outputs': [38, 35, 36, 16],
@@ -64,6 +65,13 @@ except:
 CAL_LEIDO_PIN2_RAW = [0, 120, 215, 300, 410, 570, 680, 832, 950, 1215, 1600, 2060, 4095]
 CAL_REAL_PIN2_RAW  = [0, 429, 900, 1315, 1825, 2300, 2550, 2815, 3000, 3300, 3600, 3940, 4095]
 
+# Calibración del micrófono MAX9814
+_MIC_RUIDO = 25        # Piso de ruido medido en silencio (se toma como 0)
+_MIC_MAX = 600         # Valor crudo que se considera 100% (ajustar con la calibración)
+_MIC_MUESTRAS = 400    # Cantidad de muestras por lectura (~10-15 ms)
+_MIC_SUBIDA = 0.6      # Qué tan rápido sube (0-1)
+_MIC_BAJADA = 0.15     # Qué tan rápido baja (0-1)
+_mic_nivel = [0.0, 0.0, 0.0, 0.0]
 
 # ======================================================================
 # --- 2. FUNCIONES DE INICIALIZACIÓN -----------------------------------
@@ -354,4 +362,34 @@ def reproducir_tono(n_salida: int, volumen: int, nota: int, octava: int):
     duty = int(volumen_log * 120) * 64
     
     pwm.duty_u16(duty)
+
+
+def leer_microfono(n_entrada: int, crudo: bool = False) -> int:
+    if not (1 <= n_entrada <= 4):
+        print(f"Error: microfono {n_entrada} fuera de rango (1-4).")
+        return -1
+
+    idx = n_entrada - 1
+    adc = _adc_inputs[idx]
+
+    # 1. Tomamos las muestras
+    muestras = [adc.read() for _ in range(_MIC_MUESTRAS)]
+
+    # 2. Desvío medio respecto del centro de la señal
+    media = sum(muestras) / _MIC_MUESTRAS
+    desvio = sum(abs(v - media) for v in muestras) / _MIC_MUESTRAS
+
+    if crudo:
+        return int(desvio)  # Solo para calibrar
+
+    # 3. Escalamos a 0-100
+    porcentaje = (desvio - _MIC_RUIDO) * 100 / (_MIC_MAX - _MIC_RUIDO)
+    porcentaje = max(0, min(100, porcentaje))
+
+    # 4. Suavizado tipo vúmetro: sube rápido, baja lento
+    anterior = _mic_nivel[idx]
+    coef = _MIC_SUBIDA if porcentaje > anterior else _MIC_BAJADA
+    _mic_nivel[idx] = anterior + (porcentaje - anterior) * coef
+
+    return int(_mic_nivel[idx])
 
