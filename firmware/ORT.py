@@ -182,7 +182,11 @@ def detenerTodo():
         eda_i2c.limpiar_todo()
     print("Robot completamente detenido de forma segura.")
 
-
+def microfono(n_entrada: int, crudo: bool = False) -> int:
+    """Retorna el nivel de sonido (0 a 100%) del micrófono MAX9814 en una entrada (1 a 4).
+    Con crudo=True devuelve el valor sin escalar (solo para calibrar)."""
+    return eda_core.leer_microfono(n_entrada, crudo)
+    
 # ======================================================================
 # --- PANTALLA LCD Y TECLADO (Módulo I2C) ------------------------------
 # ======================================================================
