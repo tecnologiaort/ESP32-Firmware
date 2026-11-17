@@ -206,11 +206,6 @@ def luzLCD(estado: bool, direccion: int = None):
     if _i2c_activo:
         eda_i2c.controlar_luz(estado, direccion)
 
-def leerTeclado(id_teclado: int = None) -> str:
-    """Retorna la tecla pulsada en el teclado matricial o None si no hay pulsación."""
-    if _i2c_activo:
-        return eda_i2c.leer_tecla(id_teclado)
-    return None
 
 # ======================================================================
 # --- PANTALLA OLED ----------------------------------------------------
