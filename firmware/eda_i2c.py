@@ -483,9 +483,14 @@ def inicializar_bus(pines_i2c: tuple) -> bool:
             # --- 2. LUEGO BUSCAMOS PANTALLAS LCD ---
             elif addr in HEX_TO_LCD_ID:
                 lcd_id = HEX_TO_LCD_ID[addr]
-                lcds[lcd_id] = I2cLcd(bus_i2c, addr, 16, 2)
-                lcds[lcd_id].backlight_on()
-                print(f" -> LCD asignado al ID: {lcd_id}")
+                try:
+                    lcds[lcd_id] = I2cLcd(bus_i2c, addr, 16, 2)
+                    lcds[lcd_id].backlight_on()
+                    print(f" -> LCD asignado al ID: {lcd_id}")
+                except Exception as e:
+                    # Si un LCD falla, no apagamos todo el bus (el OLED y lo demás siguen andando)
+                    lcds.pop(lcd_id, None)
+                    print(f"Error al inicializar LCD en {hex(addr)}: {e}")
                 
             # --- 3. POR ÚLTIMO TECLADOS MATRICIALES ---
             elif addr in HEX_TO_KPD_ID:
@@ -583,6 +588,34 @@ def oled_mostrar():
     if oled_display is None: return
     oled_display.show()
 
+def oled_mostrar_zona(x0, y0, x1, y1):
+    """Vuelca a la pantalla solo el rectángulo (x0, y0)-(x1, y1).
+    Es mucho más rápido que mandar la pantalla entera cuando se dibuja algo chico."""
+    d = oled_display
+    if d is None: return
+    if x0 > x1: x0, x1 = x1, x0
+    if y0 > y1: y0, y1 = y1, y0
+    x0 = max(0, int(x0)); y0 = max(0, int(y0))
+    x1 = min(d.width - 1, int(x1)); y1 = min(d.height - 1, int(y1))
+    if x0 > x1 or y0 > y1: return
+    p0, p1 = y0 // 8, y1 // 8
+    d._cmd(0x21); d._cmd(x0); d._cmd(x1)
+    d._cmd(0x22); d._cmd(p0); d._cmd(p1)
+    ancho = x1 - x0 + 1
+    buf = bytearray(1 + ancho * (p1 - p0 + 1))
+    buf[0] = 0x40
+    i = 1
+    for p in range(p0, p1 + 1):
+        o = p * d.width
+        buf[i:i + ancho] = d._buffer[o + x0:o + x1 + 1]
+        i += ancho
+    d.i2c.writeto(d.addr, buf)
+
+def oled_borrar_zona(x, y, ancho, alto):
+    """Apaga los píxeles de un rectángulo en memoria (no lo muestra)."""
+    if oled_display is not None:
+        oled_display.fill_rect(int(x), int(y), int(ancho), int(alto), 0)
+
 def oled_limpiar():
     if oled_display: 
         oled_display.fill(0)
@@ -622,9 +655,8 @@ def oled_borrar_memoria():
 _historial_sismografo = []
 def borrarOLED():
     """Limpia el buffer interno en memoria sin apagar la pantalla física."""
-    global oled
-    if oled is not None:
-        oled.fill(0)
+    if oled_display is not None:
+        oled_display.fill(0)
 
 def dibujarPerilla(x_centro, y_centro, radio, valor):
     """Dibuja una perilla circular. Recibe valores puros de 0 a 100."""

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Módulo Interno CORE (eda_core.py)
-Gestiona directamente el hardware del ESP32 (Pines, ADC, PWM).
+Gestiona directamente el hardware del ESP32 (Pines, ADC, PWM, NeoPixel, Micrófono, Celda de carga).
 
 """
 
@@ -34,8 +34,27 @@ PIN_MAPS = {
         'I2C': (9, 8),
         'us_outputs': [4, 7, 6, 34],
         'digital_data': []
+    },
+    'WEMOS': {
+        'digital_outputs': [26, 17, 27, 12],
+        'adc_inputs': [2, 4, 35, 34],
+        'digital_inputs': [5, 23, 19, 18],
+        'servo_pins': [25, 16, 14, 13],
+        'I2C': (22, 21),
+        'us_outputs': [5, 23, 19, 18]
+    },
+    'ESP32': {
+        'digital_outputs': [32, 25, 27, 12],
+        'adc_inputs': [35, 34, 39, 36],
+        'digital_inputs': [4, 2, 15, 0],
+        'servo_pins': [33, 26, 14, 13],
+        'I2C': (22, 21),
+        'us_outputs': [4, 2, 15, 0]
     }
 }
+
+# 'N_ESP32' es otro nombre de la misma placa que 'Placa_Clasica' (mismos pines)
+PIN_MAPS['N_ESP32'] = PIN_MAPS['Placa_Clasica']
 
 # Variables de estado global
 _placa_actual = None
@@ -73,6 +92,20 @@ _MIC_SUBIDA = 0.6      # Qué tan rápido sube (0-1)
 _MIC_BAJADA = 0.15     # Qué tan rápido baja (0-1)
 _mic_nivel = [0.0, 0.0, 0.0, 0.0]
 
+# Celda de carga HX711 (función sensorPeso)
+# Cuentas del HX711 que da una celda de 1 mV/V (la mayoría) cuando tiene encima su peso máximo.
+# Cuentas por gramo = _PESO_CUENTAS_MAX / (capacidad en gramos). Ej: 1 kg -> 2147, 5 kg -> 429.
+_PESO_CUENTAS_MAX = 2147484.0
+# Celdas medidas con un peso conocido: {capacidad en kg: cuentas por gramo}.
+# Tienen prioridad sobre la cuenta teórica de arriba. Para calibrar otra: factor = cuentas / gramos reales.
+_PESO_CALIBRADAS = {
+    1: 420.0,    # celda de 1 kg (valor de la librería original)
+    5: 429.5,    # celda de 5 kg (verificada: mide bien)
+}
+_PESO_REINTENTO_MS = 1000     # Si no hay celda, cada cuánto se la vuelve a buscar
+_celdas = {}                  # {n_entrada: objeto _HX711}
+_peso_ultimo_intento = [None, None, None, None]
+
 # ======================================================================
 # --- 2. FUNCIONES DE INICIALIZACIÓN -----------------------------------
 # ======================================================================
@@ -82,8 +115,8 @@ def configurar_placa(nombre_placa: str):
     global _placa_actual, PINS, _digital_outputs, _digital_inputs, _us_outputs, _adc_inputs
     
     if nombre_placa not in PIN_MAPS:
-        print(f"Error: Placa '{nombre_placa}' no válida. Usando N_ESP32 por defecto.")
-        nombre_placa = "N_ESP32"
+        print(f"Error: Placa '{nombre_placa}' no válida. Usando Placa_Clasica por defecto.")
+        nombre_placa = "Placa_Clasica"
         
     _placa_actual = nombre_placa
     PINS = PIN_MAPS[_placa_actual]
@@ -92,12 +125,15 @@ def configurar_placa(nombre_placa: str):
     _digital_outputs = [Pin(p, Pin.OUT) for p in PINS['digital_outputs']]
     for pin in _digital_outputs:
         pin.value(0)
-    _digital_data = [Pin(p, Pin.OUT) for p in PINS['digital_data']]
+    _digital_data = [Pin(p, Pin.OUT) for p in PINS.get('digital_data', [])]
     for pin in _digital_data:
         pin.value(0)
         
-    _digital_inputs = [Pin(p, Pin.IN, Pin.PULL_DOWN) for p in PINS['digital_inputs']]
-    _us_outputs = [Pin(p, Pin.IN, Pin.PULL_DOWN) for p in PINS['us_outputs']]
+    # En el ESP32 clásico los GPIO 34-39 son solo entrada y no tienen pull-down interno
+    # (en la super_mini, que es otro chip, esos pines son normales)
+    sin_pull = () if _placa_actual == 'super_mini' else (34, 35, 36, 37, 38, 39)
+    _digital_inputs = [Pin(p, Pin.IN) if p in sin_pull else Pin(p, Pin.IN, Pin.PULL_DOWN) for p in PINS['digital_inputs']]
+    _us_outputs = [Pin(p, Pin.IN) if p in sin_pull else Pin(p, Pin.IN, Pin.PULL_DOWN) for p in PINS['us_outputs']]
     
     # Inicializar ADCs
     _adc_inputs = []
@@ -160,7 +196,7 @@ def mapeo_joystick(x, cero, out_min, out_max, in_min, in_max) -> int:
 # ======================================================================
 
 def controlar_neopixel(n_salida: int, brillo: int, r: int, g: int, b: int, n_led: int, qleds: int):
-    if not (1 <= n_salida <= len(PINS['digital_data'])):
+    if not (1 <= n_salida <= len(PINS.get('digital_data', []))):
         print(f"Error: salida digital_data {n_salida} fuera de rango.")
         return
     estadoP = salidasDigitales[n_salida]
@@ -215,7 +251,7 @@ def leer_entrada_analogica(n_entrada: int) -> int:
         if _placa_actual == 'WEMOS' and n_entrada == 1:
             valor_corregido = _interpolar(valor_raw, CAL_LEIDO_PIN2_RAW, CAL_REAL_PIN2_RAW)
             porcentaje = (valor_corregido / 4050) * 100
-        elif _placa_actual == "N_ESP32":
+        elif _placa_actual in ("Placa_Clasica", "N_ESP32"):
             porcentaje = int(1.315789 * (valor_raw / 4050) * 100)
         elif _placa_actual == "ESP32_S2":
             porcentaje = int(0.495 * (valor_raw / 4050) * 100) - 2
@@ -239,7 +275,7 @@ def leer_entrada_analogica_RAW(n_entrada: int) -> float:
         if _placa_actual == 'WEMOS' and n_entrada == 1:
             valor_corregido = _interpolar(valor_raw, CAL_LEIDO_PIN2_RAW, CAL_REAL_PIN2_RAW)
             porcentaje = (valor_corregido / 4050) * 100
-        elif _placa_actual == "N_ESP32":
+        elif _placa_actual in ("Placa_Clasica", "N_ESP32"):
             porcentaje = int(1.315789 * (valor_raw / 4050) * 100)
         else:
             porcentaje = (valor_raw / 4050) * 100
@@ -393,3 +429,126 @@ def leer_microfono(n_entrada: int, crudo: bool = False) -> int:
 
     return int(_mic_nivel[idx])
 
+
+# ======================================================================
+# --- 5. CELDA DE CARGA HX711 (función sensorPeso) ---------------------
+# ======================================================================
+# La celda se enchufa en cualquiera de las 4 entradas:
+#   DT  -> pin analógico de la entrada (adc_inputs)
+#   SCK -> pin de trigger de la entrada (us_outputs)
+# La primera lectura hace la tara, así que la balanza tiene que estar vacía en ese momento.
+
+class _HX711:
+    def __init__(self, pin_dt, pin_sck):
+        self.dt = Pin(pin_dt, Pin.IN, Pin.PULL_DOWN)
+        self.sck = Pin(pin_sck, Pin.OUT, value=0)   # SCK en bajo = HX711 encendido
+        self.offset = 0
+
+    def _esperar_dato(self, timeout_ms=300):
+        # El HX711 baja DT cuando tiene una medición lista
+        t0 = utime.ticks_ms()
+        while self.dt.value() != 0:
+            if utime.ticks_diff(utime.ticks_ms(), t0) > timeout_ms:
+                raise OSError("HX711 no responde")
+            utime.sleep_us(100)
+
+    def leer_crudo(self):
+        self._esperar_dato()
+        # Sin interrupciones: si SCK queda en alto más de 60 us el HX711 se apaga
+        irq = machine.disable_irq()
+        valor = 0
+        for _ in range(24):
+            self.sck.value(1)
+            valor <<= 1
+            self.sck.value(0)
+            if self.dt.value():
+                valor += 1
+        self.sck.value(1)        # pulso 25: canal A, ganancia 128
+        self.sck.value(0)
+        machine.enable_irq(irq)
+        # Un HX711 real sube DT apenas termina la lectura y lo deja arriba mientras mide.
+        # Si no pasa, la celda se desconectó o lo que hay enchufado no es un HX711.
+        if self.dt.value() == 0:
+            raise OSError("no es un HX711")
+        utime.sleep_us(300)
+        if self.dt.value() == 0:
+            raise OSError("no es un HX711")
+        if valor & 0x800000:     # complemento a 2 (24 bits)
+            valor -= 0x1000000
+        return valor
+
+    def promedio(self, veces):
+        return sum(self.leer_crudo() for _ in range(veces)) / veces
+
+    def tarar(self):
+        lecturas = [self.leer_crudo() for _ in range(10)]
+        # Un sensor de distancia responde con un único escalón de bits (ej. 000111);
+        # una celda real tiene ruido en los bits bajos y nunca da 10 lecturas así
+        if all(_es_escalon(v) for v in lecturas):
+            raise OSError("no es un HX711")
+        self.offset = sum(lecturas) / len(lecturas)
+
+def _es_escalon(valor: int) -> bool:
+    """True si los 24 bits son todos 0, todos 1 o un único bloque de unos seguidos."""
+    v = valor & 0xFFFFFF
+    if v == 0:
+        return True
+    x = v | (v - 1)
+    return (x & (x + 1)) == 0
+
+def _liberar_entrada(idx: int):
+    """Devuelve los pines de una entrada a su función normal (analógica + trigger)."""
+    Pin(PINS['us_outputs'][idx], Pin.IN, Pin.PULL_DOWN)
+    adc = ADC(Pin(PINS['adc_inputs'][idx], Pin.IN, None))
+    adc.atten(ADC.ATTN_11DB)
+    _adc_inputs[idx] = adc
+
+def _conectar_celda(n_entrada: int):
+    """Busca el HX711 en la entrada, hace la tara y lo guarda. Devuelve None si no hay."""
+    idx = n_entrada - 1
+    _peso_ultimo_intento[idx] = utime.ticks_ms()
+    try:
+        hx = _HX711(PINS['adc_inputs'][idx], PINS['us_outputs'][idx])
+        hx.tarar()
+    except OSError:
+        _liberar_entrada(idx)
+        return None
+    _celdas[n_entrada] = hx
+    print(f"Celda de carga conectada en entrada {n_entrada} (tara hecha)")
+    return hx
+
+def leer_peso(n_entrada: int, peso_kg: float = 1) -> int:
+    """Devuelve el peso en gramos de la celda conectada en la entrada (1 a 4).
+    peso_kg es la capacidad de la celda en kg (1, 5, 10, 20...).
+    Devuelve -1 si no hay ninguna celda conectada en esa entrada."""
+    if not (1 <= n_entrada <= 4):
+        print(f"Error: sensorPeso {n_entrada} fuera de rango (1-4).")
+        return -1
+    if not isinstance(peso_kg, (int, float)) or peso_kg <= 0:
+        print(f"Error: sensorPeso peso {peso_kg} no válido (la capacidad de la celda en kg, ej. 1 o 5).")
+        return -1
+    idx = n_entrada - 1
+
+    hx = _celdas.get(n_entrada)
+    if hx is None:
+        # Sin celda: se la busca como mucho una vez por segundo para no frenar el programa
+        ultimo = _peso_ultimo_intento[idx]
+        if ultimo is not None and utime.ticks_diff(utime.ticks_ms(), ultimo) < _PESO_REINTENTO_MS:
+            return -1
+        hx = _conectar_celda(n_entrada)
+        if hx is None:
+            if ultimo is None:
+                print(f"sensorPeso: no hay celda de carga en la entrada {n_entrada}")
+            return -1
+
+    try:
+        cuentas_por_gramo = _PESO_CALIBRADAS.get(peso_kg) or _PESO_CUENTAS_MAX / (peso_kg * 1000)
+        gramos = (hx.promedio(3) - hx.offset) / cuentas_por_gramo
+    except OSError:
+        # Se desconectó: liberamos la entrada y la seguimos buscando
+        _celdas.pop(n_entrada, None)
+        _liberar_entrada(idx)
+        _peso_ultimo_intento[idx] = utime.ticks_ms()
+        print(f"Celda de carga desconectada de la entrada {n_entrada}")
+        return -1
+    return int(round(gramos))
