@@ -4,4 +4,5 @@ eda_i2c.py
 eda_wifi.py
 eda_bt.py
 eda_ia.py
+eda_help.py
 main.py
