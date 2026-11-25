@@ -55,7 +55,8 @@ _AYUDA = (
     ("WIFI Y CANALES", (
         ("conectarWifi", "conectarWifi(nombre, clave)", "Conecta la placa a una red WiFi con internet (por defecto la del taller).", 'conectarWifi("MiWiFi", "12345678")'),
         ("desconectarWifi", "desconectarWifi()", "Desconecta el WiFi y apaga la antena para ahorrar RAM y energía.", "desconectarWifi()"),
-        ("iniciarAP", "iniciarAP(nombre, clave)", "Crea una red WiFi propia para conectar otra placa.", 'iniciarAP("Robot1", "clave1234")'),
+        ("iniciarAP", "iniciarAP(nombre, clave, canal=6, potencia=\"alto\")", "Crea una red WiFi propia. potencia: \"alto\", \"medio\" o \"bajo\".", 'iniciarAP("Robot1", "clave1234", potencia="bajo")'),
+        ("estadoInternet", "estadoInternet()", "Devuelve True si el WiFi tiene salida a internet, o False si es solo local.", "if estadoInternet():"),
         ("iniciarSTA", "iniciarSTA(nombre, clave)", "Se conecta a la red de otra placa.", 'iniciarSTA("Robot1", "clave1234")'),
         ("estadoWifi", "estadoWifi()", "Devuelve True si está conectado al WiFi, o False si no.", "if estadoWifi():"),
         ("nombreRed", "nombreRed()", "Devuelve el nombre (SSID) de la red conectada, o None.", "red = nombreRed()"),
@@ -75,6 +76,8 @@ _AYUDA = (
         ("descargarWeb", "descargarWeb(url, max_bytes=2048)", "Descarga el texto de una página web cuidando la RAM del ESP32.", 'txt = descargarWeb("http://example.com")'),
         ("descargarJSON", "descargarJSON(url, max_bytes=4096)", "Descarga datos de una API en JSON y devuelve un diccionario o lista.", 'clima = descargarJSON("http://api...")'),
         ("enviarDatoWeb", "enviarDatoWeb(url, datos)", "Envía un diccionario o texto por HTTP POST a una web o webhook.", 'enviarDatoWeb("http://...", {"temp": 24})'),
+        ("ping", "ping(url)", "Mide el tiempo de respuesta en milisegundos hacia una página web.", 'ms = ping("google.com")'),
+        ("climaActual", "climaActual(dato=\"dict\")", "Clima actual en Buenos Aires. dato: \"dict\", \"texto\", \"temperatura\", \"humedad\", \"viento\" o \"estado\".", 'temp = climaActual("temperatura")'),
     )),
     ("UTILIDADES", (
         ("iniciar", "iniciar(placa, usar_i2c=True, usar_bt=False)", "Inicializa la placa y los módulos seleccionados (se ejecuta sola al importar ORT).", 'iniciar("Placa_Clasica", True, True)'),
