@@ -77,7 +77,7 @@ _AYUDA = (
         ("descargarJSON", "descargarJSON(url, max_bytes=4096)", "Descarga datos de una API en JSON y devuelve un diccionario o lista.", 'clima = descargarJSON("http://api...")'),
         ("enviarDatoWeb", "enviarDatoWeb(url, datos)", "Envía un diccionario o texto por HTTP POST a una web o webhook.", 'enviarDatoWeb("http://...", {"temp": 24})'),
         ("ping", "ping(url)", "Mide el tiempo de respuesta en milisegundos hacia una página web.", 'ms = ping("google.com")'),
-        ("climaActual", "climaActual(dato=\"dict\")", "Clima actual en Buenos Aires. dato: \"dict\", \"texto\", \"temperatura\", \"humedad\", \"viento\" o \"estado\".", 'temp = climaActual("temperatura")'),
+        ("climaActual", "climaActual(dato=\"dict\", ciudad=\"Buenos Aires\")", "Clima actual. dato: \"dict\", \"texto\", \"temperatura\", \"humedad\", \"viento\" o \"estado\".", 'temp = climaActual("temperatura", "Bariloche")'),
     )),
     ("UTILIDADES", (
         ("iniciar", "iniciar(placa, usar_i2c=True, usar_bt=False)", "Inicializa la placa y los módulos seleccionados (se ejecuta sola al importar ORT).", 'iniciar("Placa_Clasica", True, True)'),
